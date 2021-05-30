@@ -7,6 +7,7 @@ Created on Sun May 30 18:08:04 2021
 import generate_values as val
 import socket as sk
 from time import sleep
+import threading as thr
 
 # flags
 __seconds_to_next_send = 86_400
@@ -47,18 +48,31 @@ def make_message(message: str, mac_addresses: tuple, ip_addresses: tuple) -> str
 
 
 # function which simulates the IoT device's behavior
-def device():
+def device(number: int, mac_address: str, ip_address: str):
+    # create UDP socket
     out = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)
-    sleep(
-        __seconds_to_next_send
-    )  # waits for 24 hours and the sends data to the gateway
-    message = create_values_for_a_day()
-    message = make_message(
-        message, ("AA:BB:CC:DD:EE:A1", __gateway_mac), ("192.168.1.10", __gateway_ip)
-    )
-    out.sendto(message.encode("utf-8"), ("127.0.0.1", __gateway_port))
+
+    while True:
+        sleep(2)  # waits for 24 hours and the sends data to the gateway
+        # generates message
+        message = create_values_for_a_day()
+        message = make_message(
+            message, (mac_address, __gateway_mac), (ip_address, __gateway_ip),
+        )
+        try:
+            # sends message
+            print("sending message")
+            out.sendto(message.encode("utf-8"), ("127.0.0.1", __gateway_port))
+            print("message sent")
+        except Exception as e:
+            print("an error occured: ", e)
+            break
     out.close()
 
 
 if __name__ == "__main__":
-    device()
+    w = thr.Thread(
+        target=device, args=(1, "AA:BB:CC:DD:EE:A1", "192.168.1.10"), daemon=True
+    )
+    w.start()
+    w.join()
