@@ -30,11 +30,17 @@ __client_message_map = {
     "192.168.1.30": "",
     "192.168.1.40": "",
 }
-__clients_served = 0
 __clients_number = 1  # number of IoT client devices to serve
+
+# lock to limit access to the served clients counter
+__clients_lock = thr.Lock()
+__clients_served = 0
 
 
 def process_message(message, index):
+    global __client_message_map
+    global __clients_lock
+    global __clients_served
     # format message and save it in dictionary
     message = msh.unpack_message(message)
     to_save = ""
@@ -42,8 +48,12 @@ def process_message(message, index):
     for line in message.splitlines():
         to_save += f"{index} - {line}\n"
     __client_message_map[index] = to_save
-    print(__client_message_map)
     # if dictionary contains 4 formatted messages launch send to server
+    with __clients_lock:
+        __clients_served += 1
+        if __clients_served == __clients_number:
+            # send data to server
+            __clients_served = 0
 
 
 # function wich listens for messages on UDP port
