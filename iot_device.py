@@ -8,10 +8,13 @@ import generate_values as val
 from message_handler import make_message
 import socket as sk
 from time import sleep
+from sys import exit
 import threading as thr
+import signal as sig
 
 # flags
 __seconds_to_next_send = 86_400
+__stop_devices = False
 
 # for gateway connection
 __gateway_ip = "192.168.1.01"  # 12 characters
@@ -48,21 +51,23 @@ def create_values_for_a_day() -> str:
 def send_to_gateway(message):
     global __send_lock
     with __send_lock:
-        # create UDP socket
-        out = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)
-        try:
-            # sends message
-            print("sending message")
-            out.sendto(message.encode("utf-8"), ("127.0.0.1", __gateway_port))
-        except Exception as e:
-            print("an error occured: ", e)
-        finally:
-            out.close()
+        # checks if program should stop
+        if not __stop_devices:
+            # create UDP socket
+            out = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)
+            try:
+                # sends message
+                print("sending message")
+                out.sendto(message.encode("utf-8"), ("127.0.0.1", __gateway_port))
+            except Exception as e:
+                print("an error occured: ", e)
+            finally:
+                out.close()
 
 
 # function which simulates the IoT device's behavior
 def device(mac_address: str, ip_address: str):
-    while True:
+    while not __stop_devices:
         sleep(
             __seconds_to_next_send
         )  # waits for 24 hours and then sends data to the gateway
@@ -76,7 +81,20 @@ def device(mac_address: str, ip_address: str):
         print(f"Device {ip_address}: message sent")
 
 
+# handles SIGINT (ctrl+c from keyboard)
+def signal_handler(signalnumber, frame):
+    global __stop_devices
+    __stop_devices = True
+    print("stopping devices")
+
+
 if __name__ == "__main__":
     for mac_address, ip_address in __devices_address_map.items():
-        worker = thr.Thread(target=device, args=(mac_address, ip_address), daemon=True)
+        worker = thr.Thread(target=device, args=(mac_address, ip_address))
         worker.start()
+    sig.signal(sig.SIGINT, signal_handler)
+    # sig.pause() not working on Windows. replaced by sleep underneath
+    while True:
+        sleep(2)  # here to check for signals every 3 seconds
+        if __stop_devices:
+            exit()
