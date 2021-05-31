@@ -30,19 +30,20 @@ __client_message_map = {
     "192.168.1.30": "",
     "192.168.1.40": "",
 }
-__clients_served = {
-    "192.168.1.10": False,
-    "192.168.1.20": False,
-    "192.168.1.30": False,
-    "192.168.1.40": False,
-}
+__clients_served = 0
 __clients_number = 1  # number of IoT client devices to serve
 
 
 def process_message(message, index):
     # format message and save it in dictionary
+    message = msh.unpack_message(message)
+    to_save = ""
+    # adds the source ip in each line of the message
+    for line in message.splitlines():
+        to_save += f"{index} - {line}\n"
+    __client_message_map[index] = to_save
+    print(__client_message_map)
     # if dictionary contains 4 formatted messages launch send to server
-    pass
 
 
 # function wich listens for messages on UDP port
@@ -54,13 +55,16 @@ def receive_from_device(connection):
             # wait for a message
             print("ready for next message")
             message = connection.recv(4096).decode("utf-8")
-            ip = msh.get_header(message)[1]  # exctract the source IP address
+            ip = msh.get_header(message)[1]  # extract the source IP address
             source_ip = ip[0:12]
             print("message received from: ", source_ip)
-            # if IP address of device is registered
-            # schedule a thread to process the process data
-            if source_ip in __client_message_map:
-                t = thr.Thread(target=process_message, args=(message, source_ip))
+            # if IP address of device is registered schedule a thread
+            # to process the message and store it
+            if (
+                source_ip in __client_message_map
+                and __client_message_map[source_ip] == ""
+            ):
+                t = thr.Thread(target=process_message, args=(message, source_ip,))
                 t.start()
     except Exception as e:
         print("an exception has occured: ", e)
