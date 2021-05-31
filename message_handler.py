@@ -20,13 +20,12 @@ def make_message(message: str, mac_addresses: tuple, ip_addresses: tuple) -> str
     return out_message + message
 
 
+# removes header from message and return it
 def unpack_message(message: str) -> str:
     lines = message.splitlines()
-    lines.pop(0)
-    lines.pop(0)
     out = ""
-    for line in lines:
-        out += line + "\n"
+    for i in range(2, len(lines)):
+        out += lines[i] + "\n"
     return out
 
 
