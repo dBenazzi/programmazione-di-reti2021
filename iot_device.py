@@ -95,6 +95,6 @@ if __name__ == "__main__":
     sig.signal(sig.SIGINT, signal_handler)
     # sig.pause() not working on Windows. replaced by sleep underneath
     while True:
-        sleep(2)  # here to check for signals every 3 seconds
+        sleep(3)  # here to check for signals every 3 seconds
         if __stop_devices:
             exit()

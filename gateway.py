@@ -6,11 +6,13 @@ Created on Sun May 30 22:24:08 2021
 """
 import socket as sk
 import threading as thr
-import message_handler as msh
+import signal as sig
 from sys import exit
+from time import sleep
+import message_handler as msh
 
 # flags
-__stop = False
+__stop_gateway = False
 
 # for server connection
 __server_ip = "10.10.10.10"  # 11 characters
@@ -33,7 +35,7 @@ __client_message_map = {
     "192.168.1.30": "",
     "192.168.1.40": "",
 }
-__clients_number = 1  # number of IoT client devices to serve
+__clients_number = 4  # number of IoT client devices to serve
 
 # lock used to limit access to __clients_served counter
 __clients_lock = thr.Lock()
@@ -41,9 +43,12 @@ __clients_served = 0
 
 # event to start the send_to_server thread
 __send_wait = thr.Event()
+# event to wait until send_to_server has sent the message
 __send_end = thr.Event()
 
-
+# adds source ip to message received from IoT device and stores
+# it in __client_message_map
+# if messages form all the clients have been received send them
 def process_message(message, index):
     global __client_message_map
     global __clients_lock
@@ -76,7 +81,7 @@ def process_message(message, index):
 def receive_from_device(connection):
     try:
         # endless loop to receive messages
-        while True:
+        while not __stop_gateway:
             # wait for a message
             print("ready for next message")
             message = connection.recv(4096).decode("utf-8")
@@ -91,9 +96,7 @@ def receive_from_device(connection):
             ):
                 t = thr.Thread(target=process_message, args=(message, source_ip,))
                 t.start()
-    except Exception as e:
-        print("an exception has occured: ", e)
-    finally:
+    except:
         connection.close()
 
 
@@ -102,9 +105,9 @@ def receive_from_device(connection):
 def send_to_server(connection):
     global __send_wait
     global __send_end
-    while True:
+    while not __stop_gateway:
         __send_wait.wait()  # waits until the event is unlocked
-        # make message and add "MAC" and "TCP" headers
+        # construct message and add "MAC" and "TCP" headers
         message = ""
         for value in __client_message_map.values():
             message += value + "\n"
@@ -113,12 +116,18 @@ def send_to_server(connection):
             (__gateway_server_mac, __server_mac),
             (__gateway_server_ip, __server_ip),
         ).encode("utf-8")
-        # open connection
         # send message
         print("sending message to server")
-        print(message)
+        # send message to server here and then unbind connection from server
         __send_wait.clear()  # locks the send event
         __send_end.set()  # unlocks calling thread
+
+
+# handles SIGINT (ctrl+c from keyboard)
+def signal_handler(signalnumber, frame):
+    global __stop_gateway
+    __stop_gateway = True
+    print("stopping gateway (ctrl + c received)")
 
 
 if __name__ == "__main__":
@@ -129,8 +138,8 @@ if __name__ == "__main__":
     try:
         udp_socket.bind(__udp_address)
         print("waiting for IoT devices on port: ", __udp_address[1])
-    except Exception as e:
-        print("an exception has occured: ", e)
+    except IOError as e:
+        print("an exception has occured while binding udp socket: ", e)
         exit()
 
     # create and strt thread for TCP connection
@@ -140,12 +149,18 @@ if __name__ == "__main__":
     try:
         send_thread.start()
         receive_thread.start()
-        receive_thread.join()
-        send_thread.join()
     except Exception as e:
         print("an exception has occured: ", e)
-    finally:
         tcp_socket.close()
         udp_socket.close()
 
-    tcp_socket.close()
+    sig.signal(sig.SIGINT, signal_handler)
+    # sig.pause() not working on Windows. replaced by sleep underneath
+    while True:
+        sleep(3)  # here to check for signals every 3 seconds
+        if __stop_gateway:
+            udp_socket.close()
+            # wait 3 more seconds if a thread is sending a message to the server
+            __send_end.wait(3.0)
+            tcp_socket.close()
+            exit()
