@@ -26,6 +26,9 @@ __devices_address_map = {
     "AA:BB:CC:DD:EE:A4": "192.168.1.40",
 }
 
+# synchronization lock
+__send_lock = thr.Lock()
+
 # generate registered values for a day
 # values format is:
 # -------------------------------------------------
@@ -40,11 +43,25 @@ def create_values_for_a_day() -> str:
     return values_string
 
 
+# function to send data to the gateway
+# it uses a lock to avoid multiple messages sent at the same time
+def send_to_gateway(message):
+    global __send_lock
+    with __send_lock:
+        # create UDP socket
+        out = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)
+        try:
+            # sends message
+            print("sending message")
+            out.sendto(message.encode("utf-8"), ("127.0.0.1", __gateway_port))
+        except Exception as e:
+            print("an error occured: ", e)
+        finally:
+            out.close()
+
+
 # function which simulates the IoT device's behavior
 def device(mac_address: str, ip_address: str):
-    # create UDP socket
-    out = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)
-
     while True:
         sleep(
             __seconds_to_next_send
@@ -54,15 +71,9 @@ def device(mac_address: str, ip_address: str):
         message = make_message(
             message, (mac_address, __gateway_mac), (ip_address, __gateway_ip),
         )
-        try:
-            # sends message
-            print("sending message")
-            out.sendto(message.encode("utf-8"), ("127.0.0.1", __gateway_port))
-            print("message sent")
-        except Exception as e:
-            print("an error occured: ", e)
-            break
-    out.close()
+        print(f"Device {ip_address}: about to send message")
+        send_to_gateway(message)
+        print(f"Device {ip_address}: message sent")
 
 
 if __name__ == "__main__":
