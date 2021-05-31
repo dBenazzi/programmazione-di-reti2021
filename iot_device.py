@@ -18,6 +18,14 @@ __gateway_ip = "192.168.1.01"  # 12 characters
 __gateway_mac = "AA:BB:CC:DD:EE:B1"  # 17 characters
 __gateway_port = 50_000
 
+# dictionary holding IoT devices addresses
+__devices_address_map = {
+    "AA:BB:CC:DD:EE:A1": "192.168.1.10",
+    "AA:BB:CC:DD:EE:A2": "192.168.1.20",
+    "AA:BB:CC:DD:EE:A3": "192.168.1.30",
+    "AA:BB:CC:DD:EE:A4": "192.168.1.40",
+}
+
 # generate registered values for a day
 # values format is:
 # -------------------------------------------------
@@ -33,12 +41,14 @@ def create_values_for_a_day() -> str:
 
 
 # function which simulates the IoT device's behavior
-def device(number: int, mac_address: str, ip_address: str):
+def device(mac_address: str, ip_address: str):
     # create UDP socket
     out = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)
 
     while True:
-        sleep(2)  # waits for 24 hours and the sends data to the gateway
+        sleep(
+            __seconds_to_next_send
+        )  # waits for 24 hours and then sends data to the gateway
         # generates message
         message = create_values_for_a_day()
         message = make_message(
@@ -56,8 +66,6 @@ def device(number: int, mac_address: str, ip_address: str):
 
 
 if __name__ == "__main__":
-    w = thr.Thread(
-        target=device, args=(1, "AA:BB:CC:DD:EE:A1", "192.168.1.10"), daemon=True
-    )
-    w.start()
-    w.join()
+    for mac_address, ip_address in __devices_address_map.items():
+        worker = thr.Thread(target=device, args=(mac_address, ip_address), daemon=True)
+        worker.start()
