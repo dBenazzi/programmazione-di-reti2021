@@ -22,6 +22,8 @@ def make_message(message: str, mac_addresses: tuple, ip_addresses: tuple) -> str
 
 def unpack_message(message: str) -> str:
     lines = message.splitlines()
+    lines.pop(0)
+    lines.pop(0)
     out = ""
     for line in lines:
         out += line + "\n"
