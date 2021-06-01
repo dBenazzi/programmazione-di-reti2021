@@ -7,37 +7,85 @@ Created on Tue Jun  1 11:32:45 2021
 import threading as thr
 import socket as sk
 import signal as sig
-
-# import select as sel
+import selectors as sel
 from sys import exit
 from time import sleep
+import message_handler as msh
 
-# import message_handler as msh
+# flag
+__stop_server = False
+
+# gateway address
+__gateway_ip = "10.10.10.1"  # 10 characters
+__gateway_mac = "AA:BB:CC:DD:EE:B2"  # 17 characters
 
 # server address
 __tcp_address = ("127.0.0.1", 51_000)
 
+# lock to wait for accepting connections
+__accept_wait = thr.Event()
 
+# reads data from the given connection and prints it.
+# if more than 10 seconds pass after starting the function
+# socket is closed and data is not read
 def receive_message(open_connection):
+    # selector to check if data is ready on the socket
+    selector = sel.DefaultSelector()
+    selector.register(open_connection, sel.EVENT_READ)
     print("ready to receive")
-    message = open_connection.recv(4096)
-    print(message.decode("utf-8"))
+    # wait for 10 seconds or whenever there is data to read from socket
+    connection_ready = selector.select(10)
+    if connection_ready:  # check if data is ready to be read
+        try:
+            message = open_connection.recv(4096).decode("utf-8")  # read from socket
+            header = msh.get_header(message)
+            source_ip = header[1][0:10]
+            if source_ip != __gateway_ip:  # check if source is gateway
+                print("message source is not gateway")
+            else:
+                # print message containing values
+                print(f"message received from gateway {source_ip} containing:")
+                print(msh.unpack_message(message))
+        except IOError as e:
+            print("error during read:\n", e)
+            selector.close()
+            open_connection.close()
+            return
+    else:
+        print("connection timeout. no data received")
+    selector.close()
     open_connection.close()
     print("connection close")
 
 
+# accepts a new TCP connection and creates a new thread to handle it
 def accept_connections(connection):
-    connection_socket, address = connection.accept()
-    print("new connection opened")
-    thr.Thread(target=(receive_message), args=(connection_socket,)).start()
+    global __accept_wait
+    # while not __stop_server:
+    while True:
+        # __accept_wait.wait()  # hold until clients attempt connection
+        connection_socket, address = connection.accept()
+        print("new connection opened")
+        thr.Thread(target=(receive_message), args=(connection_socket,)).start()
+        # __accept_wait.clear()  # restore for next client request
+
+
+# monitors (using selectors) tcp_socket and unlocks accept_connections
+# if a new request is ready to be served.
+def connection_request_handler():
+    while not __stop_server:
+        pass
 
 
 # handles SIGINT (ctrl+c from keyboard)
 def signal_handler(signalnumber, frame):
-    exit()  # placeholder
+    global __stop_server
+    __stop_server = True
+    print("stopping server (ctrl + c received)")
 
 
 if __name__ == "__main__":
+    print("starting server")
     # handler for ctrl+c
     sig.signal(sig.SIGINT, signal_handler)
     # open TCP socket
@@ -58,3 +106,7 @@ if __name__ == "__main__":
     # sig.pause() not working on Windows. replaced by sleep underneath
     while True:
         sleep(3)  # here to check for signals every 3 seconds
+        if __stop_server:
+            if not __accept_wait.is_set():  # close socket only if no
+                tcp_socket.close()
+            exit()
