@@ -17,7 +17,7 @@ __seconds_to_next_send = 86_400
 __stop_devices = False
 
 # for gateway connection
-__gateway_ip = "192.168.1.01"  # 12 characters
+__gateway_ip = "192.168.1.1"  # 11 characters
 __gateway_mac = "AA:BB:CC:DD:EE:B1"  # 17 characters
 __gateway_port = 50_000
 
@@ -67,6 +67,7 @@ def send_to_gateway(message):
 
 # function which simulates the IoT device's behavior
 def device(mac_address: str, ip_address: str):
+    print(f"device {ip_address} ready")
     while not __stop_devices:
         sleep(
             __seconds_to_next_send

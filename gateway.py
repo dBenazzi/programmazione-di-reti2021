@@ -20,7 +20,7 @@ __server_mac = "AA:BB:CC:DD:EE:C1"  # 17 characters
 __server_port = 51_000
 
 # connection towards clients
-__gateway_client_ip = "192.168.1.01"  # 12 characters
+__gateway_client_ip = "192.168.1.1"  # 11 characters
 __gateway_client_mac = "AA:BB:CC:DD:EE:B1"  # 17 characters
 __udp_address = ("127.0.0.1", 50_000)
 
@@ -131,6 +131,7 @@ def signal_handler(signalnumber, frame):
 
 
 if __name__ == "__main__":
+    print("starting gateway")
     udp_socket = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)
     tcp_socket = sk.socket(sk.AF_INET, sk.SOCK_STREAM)
 
@@ -159,8 +160,8 @@ if __name__ == "__main__":
     while True:
         sleep(3)  # here to check for signals every 3 seconds
         if __stop_gateway:
-            udp_socket.close()
+            udp_socket.close()  # close receive socket
             # wait 3 more seconds if a thread is sending a message to the server
             __send_end.wait(3.0)
-            tcp_socket.close()
+            tcp_socket.close()  # close send socket
             exit()
