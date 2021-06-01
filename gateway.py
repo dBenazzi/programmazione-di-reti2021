@@ -94,46 +94,65 @@ def receive_from_device(connection):
                 source_ip in __client_message_map
                 and __client_message_map[source_ip] == ""
             ):
-                t = thr.Thread(target=process_message, args=(message, source_ip,))
-                t.start()
+                thr.Thread(target=process_message, args=(message, source_ip,)).start()
     except:
         connection.close()
 
 
 # sends the message to the server containing the values from the IoT clients
 # stored in __client_message_map
-def send_to_server(connection):
+def send_to_server():
     global __send_wait
     global __send_end
     while not __stop_gateway:
         __send_wait.wait()  # waits until the event is unlocked
+        if __stop_gateway:  # check if program should stop
+            return
+        # create new TCP socket
+        try:
+            connection = sk.socket(sk.AF_INET, sk.SOCK_STREAM)
+        except Exception:
+            print("couldn't create TCP connection")
+            __send_wait.clear()
+            __send_end.set()
+            continue
         # construct message and add "MAC" and "TCP" headers
         message = ""
+        # concatenates the messages from clients
         for value in __client_message_map.values():
             message += value + "\n"
+        # adds header to messages
         message = msh.make_message(
             message,
             (__gateway_server_mac, __server_mac),
             (__gateway_server_ip, __server_ip),
         ).encode("utf-8")
-        # send message
+        # connect to server and send message
         print("sending message to server")
-        # send message to server here and then unbind connection from server
-        __send_wait.clear()  # locks the send event
+        try:
+            connection.connect(("127.0.0.1", __server_port))
+            connection.send(message)
+            print("message sent")
+            connection.shutdown(sk.SHUT_RDWR)
+        except Exception:
+            print("couldn't send message to server")
+        connection.close()
+        __send_wait.clear()  # locks send event for next loop
         __send_end.set()  # unlocks calling thread
 
 
 # handles SIGINT (ctrl+c from keyboard)
 def signal_handler(signalnumber, frame):
     global __stop_gateway
+    global __send_wait
     __stop_gateway = True
+    __send_wait.set()  # unlock send thread to let it close
     print("stopping gateway (ctrl + c received)")
 
 
 if __name__ == "__main__":
     print("starting gateway")
     udp_socket = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)
-    tcp_socket = sk.socket(sk.AF_INET, sk.SOCK_STREAM)
 
     # prepare listening UDP socket
     try:
@@ -144,16 +163,15 @@ if __name__ == "__main__":
         exit()
 
     # create and strt thread for TCP connection
-    send_thread = thr.Thread(target=send_to_server, args=(tcp_socket,), daemon=True)
+    send_thread = thr.Thread(target=send_to_server)
     # create and start thread for UDP socket listening
-    receive_thread = thr.Thread(target=receive_from_device, args=(udp_socket,))
-    try:
-        send_thread.start()
-        receive_thread.start()
-    except Exception as e:
-        print("an exception has occured: ", e)
-        tcp_socket.close()
-        udp_socket.close()
+    receive_thread = thr.Thread(
+        target=receive_from_device, args=(udp_socket,), daemon=True
+    )
+
+    # start send and receive threads
+    send_thread.start()
+    receive_thread.start()
 
     sig.signal(sig.SIGINT, signal_handler)
     # sig.pause() not working on Windows. replaced by sleep underneath
@@ -162,6 +180,4 @@ if __name__ == "__main__":
         if __stop_gateway:
             udp_socket.close()  # close receive socket
             # wait 3 more seconds if a thread is sending a message to the server
-            __send_end.wait(3.0)
-            tcp_socket.close()  # close send socket
             exit()
