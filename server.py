@@ -19,7 +19,7 @@ __stop_server = False
 __gateway_ip = "10.10.10.1"  # 10 characters
 __gateway_mac = "AA:BB:CC:DD:EE:B2"  # 17 characters
 
-# server address
+# socket address
 __tcp_address = ("127.0.0.1", 51_000)
 
 # lock to wait for accepting connections
@@ -44,7 +44,7 @@ def receive_message(open_connection):
                 print("message source is not gateway")
             else:
                 # print message containing values
-                print(f"message received from gateway {source_ip} containing:")
+                print(f"message received from gateway ({source_ip}) containing:\n")
                 print(msh.unpack_message(message))
         except IOError as e:
             print("error during read:\n", e)
@@ -61,20 +61,25 @@ def receive_message(open_connection):
 # accepts a new TCP connection and creates a new thread to handle it
 def accept_connections(connection):
     global __accept_wait
-    # while not __stop_server:
-    while True:
-        # __accept_wait.wait()  # hold until clients attempt connection
+    while not __stop_server:
+        __accept_wait.wait()  # hold until clients attempt connection
         connection_socket, address = connection.accept()
         print("new connection opened")
         thr.Thread(target=(receive_message), args=(connection_socket,)).start()
-        # __accept_wait.clear()  # restore for next client request
+        __accept_wait.clear()  # restore for next client request
 
 
-# monitors (using selectors) tcp_socket and unlocks accept_connections
+# monitors (using selectors) tcp_socket and unlocks accept_wait
 # if a new request is ready to be served.
-def connection_request_handler():
+def connection_request_notifier(connection):
+    global __accept_wait
+    selector = sel.DefaultSelector()
+    selector.register(connection, sel.EVENT_READ)
     while not __stop_server:
-        pass
+        accept_ready = selector.select(5)
+        if accept_ready:
+            __accept_wait.set()
+    selector.close()
 
 
 # handles SIGINT (ctrl+c from keyboard)
@@ -98,15 +103,20 @@ if __name__ == "__main__":
         tcp_socket.close()
         exit(-1)
 
-    connection_acceptor = thr.Thread(
-        target=accept_connections, args=(tcp_socket,), daemon=True
+    # start thread accepting connection and its notifier
+    thr.Thread(target=accept_connections, args=(tcp_socket,), daemon=True).start()
+    connection_notifier = thr.Thread(
+        target=connection_request_notifier, args=(tcp_socket,)
     )
-    connection_acceptor.start()
+    connection_notifier.start()
 
+    print("server ready")
     # sig.pause() not working on Windows. replaced by sleep underneath
     while True:
         sleep(3)  # here to check for signals every 3 seconds
         if __stop_server:
-            if not __accept_wait.is_set():  # close socket only if no
+            # close socket only if not acecpting a connection
+            if not __accept_wait.is_set():
+                connection_notifier
                 tcp_socket.close()
             exit()
