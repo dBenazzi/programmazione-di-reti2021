@@ -42,7 +42,7 @@ __send_lock = thr.Lock()
 def create_values_for_a_day() -> str:
     values_string = ""
     for i in range(24):
-        values_string += f"{i:02d}:00 - {val.generate_temperature():0>5.2f} - {val.generate_humidity():0>5.2f}\n"
+        values_string += f"{i:02d}:00 - {val.generate_temperature():0>5.2f}°C - {val.generate_humidity():0>5.2f}g/m^3\n"
     return values_string
 
 
@@ -86,7 +86,7 @@ def device(mac_address: str, ip_address: str):
 def signal_handler(signalnumber, frame):
     global __stop_devices
     __stop_devices = True
-    print("stopping devices")
+    print("stopping devices (ctrl + c received)")
 
 
 if __name__ == "__main__":
