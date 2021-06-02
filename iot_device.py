@@ -48,11 +48,12 @@ def create_values_for_a_day() -> str:
 
 # function to send data to the gateway
 # it uses a lock to avoid multiple messages sent at the same time
-def send_to_gateway(message):
+def send_to_gateway(message, source):
     global __send_lock
     with __send_lock:
         # checks if program should stop
         if not __stop_devices:
+            print(f"Device {source}: about to send message")
             # create UDP socket
             out = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)
             try:
@@ -63,6 +64,7 @@ def send_to_gateway(message):
                 print("an error occured: ", e)
             finally:
                 out.close()
+            print(f"Device {source}: message sent")
 
 
 # function which simulates the IoT device's behavior
@@ -77,9 +79,7 @@ def device(mac_address: str, ip_address: str):
         message = make_message(
             message, (mac_address, __gateway_mac), (ip_address, __gateway_ip),
         )
-        print(f"Device {ip_address}: about to send message")
-        send_to_gateway(message)
-        print(f"Device {ip_address}: message sent")
+        send_to_gateway(message, ip_address)
 
 
 # handles SIGINT (ctrl+c from keyboard)
