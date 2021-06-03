@@ -7,13 +7,17 @@ Created on Sun May 30 18:08:04 2021
 import generate_values as val
 from message_handler import make_message
 import socket as sk
-from time import sleep
+from time import sleep, perf_counter_ns
 from sys import exit
 import threading as thr
 import signal as sig
 
+# change to True to send data to gateway every 3 seconds
+# instead of a day
+__dbg = False
+
 # flags
-__seconds_to_next_send = 86_400
+__seconds_to_next_send = 86_400 if not __dbg else 3
 __stop_devices = False
 
 # for gateway connection
@@ -59,12 +63,14 @@ def send_to_gateway(message, source):
             try:
                 # sends message
                 print("sending message")
+                t1 = perf_counter_ns()
                 out.sendto(message.encode("utf-8"), ("127.0.0.1", __gateway_port))
+                t2 = perf_counter_ns()
             except Exception as e:
                 print("an error occured: ", e)
             finally:
                 out.close()
-            print(f"Device {source}: message sent")
+            print(f"Device {source}: message sent in {(t2 - t1)/(1000):0>3.0f} ms")
 
 
 # function which simulates the IoT device's behavior
