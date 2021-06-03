@@ -8,7 +8,7 @@ import socket as sk
 import threading as thr
 import signal as sig
 from sys import exit
-from time import sleep
+from time import sleep, perf_counter_ns
 import message_handler as msh
 
 # flags
@@ -113,8 +113,8 @@ def send_to_server():
             connection = sk.socket(sk.AF_INET, sk.SOCK_STREAM)
         except Exception:
             print("couldn't create TCP connection")
-            __send_wait.clear()
-            __send_end.set()
+            __send_wait.clear()  # locks send event for next loop
+            __send_end.set()  # unlocks calling thread
             continue
         # construct message and add "MAC" and "TCP" headers
         message = ""
@@ -127,12 +127,15 @@ def send_to_server():
             (__gateway_server_mac, __server_mac),
             (__gateway_server_ip, __server_ip),
         ).encode("utf-8")
+        print(message.decode("utf-8"))
         # connect to server and send message
         print("sending message to server")
         try:
+            t1 = perf_counter_ns()
             connection.connect(("127.0.0.1", __server_port))
             connection.send(message)
-            print("message sent")
+            t2 = perf_counter_ns()
+            print(f"message sent in {(t2 - t1)/(1000):0>3.0f} ms")
             connection.shutdown(sk.SHUT_RDWR)
         except Exception:
             print("couldn't send message to server")
