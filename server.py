@@ -115,8 +115,8 @@ if __name__ == "__main__":
     while True:
         sleep(3)  # here to check for signals every 3 seconds
         if __stop_server:
-            # close socket only if not acecpting a connection
+            # close socket only if not accepting a connection
             if not __accept_wait.is_set():
-                connection_notifier
+                connection_notifier.join()
                 tcp_socket.close()
             exit()
