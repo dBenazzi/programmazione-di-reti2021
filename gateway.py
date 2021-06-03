@@ -84,7 +84,7 @@ def receive_from_device(connection):
         while not __stop_gateway:
             # wait for a message
             print("ready for next message")
-            message = connection.recv(4096).decode("ascii")
+            message = connection.recv(1024).decode("ascii")
             ip = msh.get_header(message)[1]  # extract the source IP address
             source_ip = ip[0:12]
             print("message received from: ", source_ip)
