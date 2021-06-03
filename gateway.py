@@ -84,7 +84,7 @@ def receive_from_device(connection):
         while not __stop_gateway:
             # wait for a message
             print("ready for next message")
-            message = connection.recv(4096).decode("utf-8")
+            message = connection.recv(4096).decode("ascii")
             ip = msh.get_header(message)[1]  # extract the source IP address
             source_ip = ip[0:12]
             print("message received from: ", source_ip)
@@ -126,8 +126,7 @@ def send_to_server():
             message,
             (__gateway_server_mac, __server_mac),
             (__gateway_server_ip, __server_ip),
-        ).encode("utf-8")
-        print(message.decode("utf-8"))
+        ).encode("ascii")
         # connect to server and send message
         print("sending message to server")
         try:
@@ -160,7 +159,7 @@ if __name__ == "__main__":
     # prepare listening UDP socket
     try:
         udp_socket.bind(__udp_address)
-        print("waiting for IoT devices on port: ", __udp_address[1])
+        print("waiting for IoT devices on port:", __udp_address[1])
     except IOError as e:
         print("an exception has occured while binding udp socket: ", e)
         exit()

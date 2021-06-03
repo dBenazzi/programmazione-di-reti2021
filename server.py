@@ -37,7 +37,7 @@ def receive_message(open_connection):
     connection_ready = selector.select(10)
     if connection_ready:  # check if data is ready to be read
         try:
-            message = open_connection.recv(4096).decode("utf-8")  # read from socket
+            message = open_connection.recv(4096).decode("ascii")  # read from socket
             header = msh.get_header(message)
             source_ip = header[1][0:10]
             if source_ip != __gateway_ip:  # check if source is gateway
@@ -45,7 +45,9 @@ def receive_message(open_connection):
             else:
                 # print message containing values
                 print(f"message received from gateway ({source_ip}) containing:\n")
-                print(msh.unpack_message(message))
+                print(
+                    msh.unpack_message(message).replace("!", "°C").replace("?", "g/m^3")
+                )
         except IOError as e:
             print("error during read:\n", e)
             selector.close()
@@ -110,7 +112,7 @@ if __name__ == "__main__":
     )
     connection_notifier.start()
 
-    print("server ready")
+    print("server ready on port", __tcp_address[1])
     # sig.pause() not working on Windows. replaced by sleep underneath
     while True:
         sleep(3)  # here to check for signals every 3 seconds

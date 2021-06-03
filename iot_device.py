@@ -14,7 +14,7 @@ import signal as sig
 
 # change to True to send data to gateway every 3 seconds
 # instead of a day
-__dbg = False
+__dbg = True
 
 # flags
 __seconds_to_next_send = 86_400 if not __dbg else 3
@@ -46,7 +46,7 @@ __send_lock = thr.Lock()
 def create_values_for_a_day() -> str:
     values_string = ""
     for i in range(24):
-        values_string += f"{i:02d}:00 - {val.generate_temperature():0>5.2f}°C - {val.generate_humidity():0>5.2f}g/m^3\n"
+        values_string += f"{i:02d}:00 - {val.generate_temperature():0>5.2f}! - {val.generate_humidity():0>5.2f}?\n"
     return values_string
 
 
@@ -64,7 +64,7 @@ def send_to_gateway(message, source):
                 # sends message
                 print("sending message")
                 t1 = perf_counter_ns()
-                out.sendto(message.encode("utf-8"), ("127.0.0.1", __gateway_port))
+                out.sendto(message.encode("ascii"), ("127.0.0.1", __gateway_port))
                 t2 = perf_counter_ns()
             except Exception as e:
                 print("an error occured: ", e)
