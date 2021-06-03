@@ -14,7 +14,7 @@ import signal as sig
 
 # change to True to send data to gateway every 3 seconds
 # instead of a day
-__dbg = True
+__dbg = False
 
 # flags
 __seconds_to_next_send = 86_400 if not __dbg else 3
